@@ -1644,7 +1644,7 @@ void parseZHAcommand(Map descMap) {
                             case '70' : // (112) isPJ1203A divideBy10
                                 if (isSPM02V3()) {
                                     logDebug "(70) SPM02V3 Voltage B : ${value / getVoltageDiv()} V raw ($value)"
-                                    phaseEvent("V", "voltage", value / getVoltageDiv()) // Assuming getVoltageDiv() is 10
+                                    phaseEvent("B", "voltage", value / getVoltageDiv()) // Assuming getVoltageDiv() is 10
                                 }
                                 else if (isPJ1203A()) { 
                                     logDebug "(112) PJ1203A voltage : ${value / getVoltageDiv()} raw ($value)" 
