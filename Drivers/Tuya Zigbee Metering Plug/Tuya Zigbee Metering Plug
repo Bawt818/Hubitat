@@ -90,13 +90,13 @@ import groovy.transform.Field
 import hubitat.zigbee.zcl.DataType
 import groovy.transform.CompileStatic
 
-static String version() { '2.0.1' }
-static String timeStamp() { '2025/04/12 4:05 PM' }
+static String version() { '2.0.2' }
+static String timeStamp() { '2025/05/10 1:05 PM' }
 
 @Field static final Boolean _DEBUG = false
 
 metadata {
-    definition(name: 'Tuya Zigbee Metering Plug', namespace: 'kkossev', author: 'Krassimir Kossev', importUrl: 'https://raw.githubusercontent.com/kkossev/Hubitat/development/Drivers/Tuya%20Zigbee%20Metering%20Plug/Tuya%20Zigbee%20Metering%20Plug', singleThreaded: true ) {
+    definition(name: 'Tuya Zigbee Metering Plug Dev', namespace: 'kkossev', author: 'Krassimir Kossev', importUrl: 'https://raw.githubusercontent.com/kkossev/Hubitat/development/Drivers/Tuya%20Zigbee%20Metering%20Plug/Tuya%20Zigbee%20Metering%20Plug', singleThreaded: true ) {
         capability 'EnergyMeter'
         capability 'PowerMeter'
         capability 'CurrentMeter'
@@ -108,7 +108,8 @@ metadata {
         //capability "Configuration"
         capability 'Sensor'
         capability 'Health Check'
-
+        
+        ///////////////////////////////////////////////////////////
         attribute 'rtt', 'number'
         attribute 'powerFactor', 'NUMBER'
         attribute 'energyCost', 'NUMBER'
@@ -119,6 +120,35 @@ metadata {
         //attribute "dailyEnergy", "string"
         attribute 'healthStatus', 'enum', ['unknown', 'offline', 'online']
         attribute 'temperature', 'NUMBER'    // Tongou SY2
+        ////////////////////////////////////////////////////////////
+        // SPM02V3 attributes
+        attribute "energyProducedTotal", "NUMBER"
+        attribute "powerFactor", "NUMBER"
+        attribute "acFrequency", "NUMBER"    
+        // Add attributes for Phase A
+        attribute "voltageA", "NUMBER"
+        //attribute "currentA", "number"
+        attribute "powerA", "NUMBER"
+        attribute "powerFactorA", "NUMBER"
+        attribute "energyA", "NUMBER"
+        attribute "energyProducedA", "NUMBER"
+        // Add attributes for Phase B
+        attribute "voltageB", "NUMBER"
+        //attribute "currentB", "number"
+        attribute "powerB", "NUMBER"
+        attribute "powerFactorB", "NUMBER"
+        attribute "energyB", "NUMBER"
+        attribute "energyProducedB", "NUMBER"
+        // Add attributes for Phase C
+        attribute "voltageC", "NUMBER"
+        //attribute "currentC", "number"
+        attribute "powerC", "NUMBER"
+        attribute "powerFactorC", "NUMBER"
+        attribute "energyC", "NUMBER"
+        attribute "energyProducedC", "NUMBER"
+        // Optional attribute for update frequency setting
+        attribute "updateFrequency", "NUMBER"
+        ///////////////////////////////////////////////////////////
 
         command 'initialize', [[name: 'Manually initialize the plug after switching drivers.\n\r ***** Will load device default values! *****' ]]
         command 'childLock', [[name:'Child Lock', type: 'ENUM', description: 'Select Child Lock mode', constraints: ['off', 'on']]]
@@ -178,6 +208,7 @@ metadata {
         fingerprint profileId:'0104', endpointId:'01', inClusters:'0000,0004,0005,EF00', outClusters:'0019,000A', model:'TS0601', manufacturer:'_TZE200_bcusnqt8', deviceJoinName: 'Zemismart Real-time Smart Energy Monitor'  // SPM01
         fingerprint profileId:'0104', endpointId:'01', inClusters:'0000,0004,0005,EF00', outClusters:'0019,000A', model:'TS0601', manufacturer:'_TZE204_ves1ycwx', deviceJoinName: 'Zemismart Real-time Smart Energy Monitor'  // SPM02
         fingerprint profileId:'0104', endpointId:'01', inClusters:'0000,0004,0005,EF00', outClusters:'0019,000A', model:'TS0601', manufacturer:'_TZE200_ves1ycwx', deviceJoinName: 'Zemismart Real-time Smart Energy Monitor'  // SPM02
+        fingerprint profileId:'0104', endpointId:'01', inClusters:'0000,0004,0005,EF00,0000,ED00', outClusters:'0019,000A', model:'TS0601', manufacturer:'_TZE284_dikb3dp6', deviceJoinName: 'Zemismart Real-time Smart Energy Monitor'  // SPM02 THIS IS THE NEW DEVICE THAT REQUIRES THE NEW DRIVER
         fingerprint profileId:'0104', endpointId:'01', inClusters:'0000,0004,0005,EF00', outClusters:'0019,000A', model:'TS0601', manufacturer:'_TZE200_v9hkz2yn', deviceJoinName: 'Zemismart Real-time Smart Energy Monitor'  // https://community.hubitat.com/t/release-tuya-zigbee-metering-plug-w-healthstatus/86465/520?u=kkossev
         fingerprint profileId:'0104', endpointId:'01', inClusters:'0000,0004,0005,EF00', outClusters:'0019,000A', model:'TS0601', manufacturer:'_TZE204_81yrt3lo', deviceJoinName: 'Bidirectional energy meter with 80A current clamp'       // https://github.com/Koenkk/zigbee-herdsman-converters/blob/8162314dbfd6e3803aeaf1d35fffd83c7e6ff5c6/src/devices/tuya.ts#L5185
         fingerprint profileId:'0104', endpointId:'01', inClusters:'0000,0004,0005,EF00,FF66"', outClusters:'0019,000A', model:'TS0601', manufacturer:'_TZE200_rks0sgb7', deviceJoinName: 'Bidirectional energy meter with 80A current clamp'  //https://community.hubitat.com/t/driver-for-zigbee-tuya-power-monitoring/123257/14?u=kkossev
@@ -341,7 +372,7 @@ metadata {
 @Field static final Integer debouncingTimer = 300
 @Field static final Integer digitalTimer = 1000
 @Field static final Integer refreshTimer = 3000
-@Field static final Integer MAX_POWER = 15000               // power cap 15 kW
+@Field static final Integer MAX_POWER = 25000               // power cap 25 kW, sorry it can exceed 15kW for me 
 @Field static final Integer COMMAND_TIMEOUT = 6
 @Field static final Integer MAX_PING_MILISECONDS = 10000    // rtt more than 10 seconds will be ignored
 @Field static final String UNKNOWN = 'UNKNOWN'
@@ -394,6 +425,7 @@ private boolean isTongouSY1()           { (device?.getDataValue('manufacturer') 
 private boolean isTongouSY2()           { (device?.getDataValue('manufacturer') ?: 'n/a') in ['_TZ3000_cayepv1a', '_TZ3000_lepzuhto', '_TZ3000_qystbcjg'] }    // Din rail switch with power monitoring and threshold settings
 private boolean isPJ1203A()             { device.getDataValue('manufacturer') in ['_TZE204_81yrt3lo', '_TZE200_rks0sgb7'] }     // Bidirectional energy meter with 80A current clamp
 private boolean isSPM01()               { device.getDataValue('manufacturer') in ['_TZE200_bcusnqt8', '_TZE200_qhlxve78'] }     // Zemismart Single phase energy meter
+private boolean isSPM02V3()             { device.getDataValue('manufacturer') in ['_TZE284_dikb3dp6'] } 	// My attempt I think it is different than all the others
 
 private boolean isSmartThingsOutlet() { (device.getDataValue('manufacturer') in ['SmartThings']) || (device.getDataValue('model') in ['outletv4']) }
 private boolean isSengledOutlet() { device.getDataValue('model') == 'E1C-NB7' }
@@ -412,7 +444,7 @@ private boolean isShelly() { device.getDataValue('manufacturer') == 'Shelly' }
 private boolean isReportingConfigurable() { isSmartThingsOutlet() || isSengledOutlet() || isJascoProductsOutlet() || isFrientEnergyMonitor() || isFrientOutlet() || isCCM300() || isSercomm() || isDevelco() || isSiHAS() || isThirdRealityUS() || isThirdRealityEU() }
 
 // Tuya : default powerDiv = 1
-private int getPowerDiv() { isShelly() ? 100 : (isThirdRealityUS() || isThirdRealityEU() || isSengledOutlet() || isJascoProductsOutlet() || isSmartThingsOutlet() || (isTuyaSpecificCluster() || isPJ1203A() && !(isDinRail() || isRTXCircuitBreaker() || isSPM01()))) ? 10 : 1 }
+private int getPowerDiv() { isSPM02V3() ? 1 : isShelly() ? 100 : (isThirdRealityUS() || isThirdRealityEU() || isSengledOutlet() || isJascoProductsOutlet() || isSmartThingsOutlet() || (isTuyaSpecificCluster() || isPJ1203A() && !(isDinRail() || isRTXCircuitBreaker() || isSPM01()))) ? 10 : 1 } //SPM02V3 is a part of isTuyaSpecificCluster() so I specify it's 1 earlier
 // Tuya :  energyDiv = 100 ThirdReality: 3600000
 private int getEnergyDiv() { (isThirdRealityEU() || isThirdRealityUS()) ? 3600000 : isShelly() ? 1000000 : (isSengledOutlet() || isJascoProductsOutlet()) ? 10000 : (isFrientEnergyMonitor() || isFrientOutlet() || isCCM300() || isSiHAS() ) /*|| isThirdRealityUS()*/ ? 1000 : 100 }
 // Tuya :  currentDiv = 1000 ThirdReality: 1000
@@ -688,6 +720,89 @@ void parseOnOffAttributes(final Map it) {
     if (settings?.logEnable) { logInfo "${attrName} is ${mode}" }
 }
 
+//////////////////////////////////////////
+// SPM02V3 events
+
+
+/**
+ * Sends an event for a specific phase measurement.
+ *
+ * @param phase The phase identifier ("A", "B", or "C").
+ * @param measurementType The type of measurement (e.g., "power", "voltage", "current", "energy", "energyProduced", "powerFactor").
+ * @param value The numeric value of the measurement (should be already scaled).
+ */
+private void phaseEvent(String phase, String measurementType, value) {
+    // Basic validation
+    if (value == null) return
+    if (!(phase in ["A", "B", "C"])) {
+        log.warn "Invalid phase '${phase}' provided to phaseEvent."
+        return
+    }
+
+    // Determine unit based on measurement type
+    String unit = ""
+    String attributeName = "${measurementType}${phase}" // Construct attribute name, e.g., powerA, voltageB
+
+    switch (measurementType) {
+        case "power":
+            unit = "W"
+            break
+        case "voltage":
+            unit = "V"
+            break
+        case "current":
+            if (settings.reportAmperage != true) { // this is since I don't care about the amperage, could be added for other measurement types and/or be separeted from the totals
+            logDebug "ignored amperageEvent (${amperage}) - reportAmperage is disabled"
+            return
+       		}
+            unit = "A"
+            break
+        case "energy":
+            unit = "kWh"
+            break
+        case "energyProduced":
+            unit = "kWh"
+            break
+        case "powerFactor":
+            unit = ""
+            break
+        default:
+            log.warn "Unknown measurementType '${measurementType}' provided to phaseEvent for phase ${phase}."
+            return
+    }
+
+    Map map = [:]
+    map.name = attributeName
+    map.value = value
+    map.unit = unit
+    map.type = 'physical'
+    map.isStateChange = true
+    map.descriptionText = "Phase ${phase} ${measurementType.capitalize()}: ${value} ${unit}"
+
+    logDebug "Sending ${attributeName} event: ${value} ${unit}"
+    sendEvent(map)
+
+    runIn(1, formatAttrib, [overwrite: true])
+}
+
+private void energyProducedTotalEvent(value) {
+    if (value == null) return
+
+    Map map = [:]
+    map.name = 'energyProducedTotal'
+    map.value = value
+    map.unit = 'kWh'
+    map.type = 'physical'
+    map.isStateChange = true
+    map.descriptionText = "Total Produced Energy is: ${value} kWh"
+
+    logDebug "Sending energyProducedTotal event: ${value} kWh"
+    sendEvent(map)
+    runIn(1, formatAttrib, [overwrite: true]) 
+}
+
+//////////////////////////////////////////
+
 /* groovylint-disable-next-line NoDef */
 void switchEvent(value) {
     Map map = [:]
@@ -880,7 +995,7 @@ void energyEvent(energy_total, boolean isDigital=false) {
     /* groovylint-disable-next-line NoDef */
     def energy = energy_total
     energy = (energy_total - safeToDouble(state.lastResetEnergy)).round(3)
-    if (energy < 0.0) {
+	if (energy < 0.0) {
         logWarn "energyEvent: negative energy ${energy} (total=${energy_total} lastReset=${safeToDouble(state.lastResetEnergy).round(3)}), correcting it to 0!"
         energy = 0.0
     }
@@ -1148,7 +1263,7 @@ void parseZHAcommand(Map descMap) {
                         String cmd = descMap.data[2]
                         switch (cmd) { // code : descMap.data[2]    ; attrId = descMap.data[1] + descMap.data[0]
                             case '01' : // switch state on/of for all models except the DinRail and RTX
-                                if (isDinRail() || isRTXCircuitBreaker() || isSPM01()) {
+                                if (isDinRail() || isRTXCircuitBreaker() || isSPM01() || isSPM02V3()) {
                                     logDebug "(01) Forward/Real Energy : ${value} raw"
                                     energyEvent(value / getEnergyDiv())    // should be 100
                                 }
@@ -1331,12 +1446,47 @@ void parseZHAcommand(Map descMap) {
                                 break
                             case '15' : // (21) Forward energy
                             case '16' : // (22) Forward energy
-                            case '17' : // (23) Forward energy
+                            case '17' : // DP 23: Total Reverse/Produced Energy (kWh) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(17) SPM02V3 Total Produced Energy : ${value} raw"
+                                    energyProducedTotalEvent(value / getEnergyDiv()) // assuming getEnergyDiv() is 100
+                                }
+                                else {
+                                    logDebug "Unhandled dp=17 value=${value}"
+                                }
+                                break
                             case '18' : // (24) Forward energy
                                 logInfo "(${cmd}) Forward energy : ${value}"
                                 break
                             case '1D' : // hochChildLock: 29
-                                if (txtEnable == true) { log.info "${device.displayName} Child Lock = ${value == 0 ? 'off' : 'on'}" }
+                                if (isSPM02V3()) {
+                                    logDebug "(1D) SPM02V3 Total Active Power : ${value} raw"
+                                    powerEvent(value / getPowerDiv()) // Assuming getPowerDiv() is 1 (raw)
+                                }
+                                else if (isHoch()) {
+                                    if (txtEnable == true) { log.info "${device.displayName} Child Lock = ${value == 0 ? 'off' : 'on'}" }
+                                }
+                                else {
+                                     logDebug "Unhandled dp=1D value=${value}"
+                                }
+                                break
+                            case '20': // DP 32: AC Frequency (Hz) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(20) SPM02V3 AC Frequency : ${value} raw"
+                                    frequencyEvent(value / getFrequencyDiv()) // Assuming getFrequencyDiv() is 100
+                                }
+                                else {
+                                    logDebug "Unhandled dp=20 value=${value}"
+                                }
+                                break
+                            case '32': // DP 50: Total Power Factor (%) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(32) SPM02V3 Total Power Factor : ${value} raw"
+                                    powerFactorEvent(value / getPowerFactorDiv()) // Assuming getPowerFactorDiv() is 1 (raw)
+                                }
+                                else {
+                                    logDebug "Unhandled dp=32 value=${value}"
+                                }
                                 break
                             case '65' : // (101) Voltage HOCH    // DPID_ELECTRIC_ADD 101 // Total Energy ?
                                 if ((device.getDataValue('manufacturer') in ['_TZE204_cjbofhxw']) || isDinRail() || isRTXCircuitBreaker()) { // TODO - check RTX
@@ -1372,6 +1522,10 @@ void parseZHAcommand(Map descMap) {
                                     logDebug "(102) SPM01 voltage : ${value / getVoltageDiv()} raw ($value)"
                                     voltageEvent(value / getVoltageDiv())
                                 }
+                                else if (isSPM02V3()) {
+                                    // This is DP 102 'update_frequency'. It's usually SET, but maybe value is reported back?
+                                    logDebug "(66) SPM02V3 Update Frequency Setting: ${value} seconds"
+                                }
                                 else {
                                     logInfo "(102) Produced Energy : ${value} kWh  (raw ${value} )"
                                 }
@@ -1380,6 +1534,10 @@ void parseZHAcommand(Map descMap) {
                                 if (isSPM01()) {
                                     logDebug "(103) Amperage HOCH : ${(value / 1000.0F)} A (raw ${value})"
                                     amperageEvent((value as Float) / 1000.0F)
+                                }
+                                else if (isSPM02V3()) {
+                                    logDebug "(67) SPM02V3 Voltage A : ${value / getVoltageDiv()} V raw ($value)"
+                                    phaseEvent("A", "voltage", value / getVoltageDiv()) // Assuming getVoltageDiv() is 10
                                 }
                                 else {
                                     value = (zigbee.convertHexToInt(descMap.data[8]) + zigbee.convertHexToInt(descMap.data[7]) * 256)
@@ -1395,6 +1553,10 @@ void parseZHAcommand(Map descMap) {
                                     logDebug "(104) SPM01 power : ${value / getPowerDiv()} raw ($value)"
                                     powerEvent(value / getPowerDiv())
                                 }
+                                else if (isSPM02V3()) {
+                                    logDebug "(68) SPM02V3 Current A : ${value / getCurrentDiv()} A raw ($value)"
+                                    phaseEvent("A", "current", value / getCurrentDiv()) // Assuming getCurrentDiv() is 1000
+                                }
                                 else {
                                     logInfo "(104) Hoch Leakage Current is : ${value / getCurrentDiv()} raw (${value}) A"
                                 }
@@ -1408,9 +1570,22 @@ void parseZHAcommand(Map descMap) {
                                     logDebug "(105) PJ1203A power_b : ${value / getPowerDiv()} raw ($value)"
                                     // powerEvent(value / getPowerDiv())
                                 }
+                                else if (isSPM02V3()) {
+                                    logDebug "(69) SPM02V3 Power A : ${value / getPowerDiv()} W raw ($value)"
+                                    phaseEvent("A", "power", value / getPowerDiv()) // Assuming getPowerDiv() is 1 (raw)
+                                }
                                 else {
                                     logInfo "(105) frequency : ${value} raw (${value / getFrequencyDiv()}) Hz"
                                     frequencyEvent(value / getFrequencyDiv())
+                                }
+                                break
+                            case '6C': // DP 108: Power Factor A (%) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(6C) SPM02V3 Power Factor A : ${value / getPowerFactorDiv()} % raw ($value)"
+                                    phaseEvent("A", "powerFactor", value / getPowerFactorDiv()) // Assuming getPowerFactorDiv() is 1 (raw)
+                                }
+                                else {
+                                    logWarn "Unhandled dp=6C value=${value}"
                                 }
                                 break
                             case '6A' : // (106)
@@ -1429,6 +1604,10 @@ void parseZHAcommand(Map descMap) {
                                 if (isPJ1203A()) {
                                     logDebug "(109) PJ1203A energy_produced_B : ${value / getEnergyDiv()} raw ($value)"
                                 }
+                                else if (isSPM02V3()) {
+                                    logDebug "(6D) SPM02V3 Energy A : ${value / getEnergyDiv()} kWh raw ($value)"
+                                    phaseEvent("A", "energy", value / getEnergyDiv()) // Assuming getEnergyDiv() is 100
+                                }
                                 else {
                                     logInfo "(109) Reactive Power : ${value} raw (${value / getPowerDiv()} VAr)"
                                 }
@@ -1440,6 +1619,10 @@ void parseZHAcommand(Map descMap) {
                                 else if (isPJ1203A()) {
                                     logInfo "(110) PJ1203A power_factor_a : ${value / getPowerFactorDiv()} raw ($value)"
                                     powerFactorEvent(value / getPowerFactorDiv())
+                                }
+                                else if (isSPM02V3()) {
+                                    logDebug "(6E) SPM02V3 Energy Produced A : ${value / getEnergyDiv()} kWh raw ($value)"
+                                    phaseEvent("A", "energyProduced", value / getEnergyDiv()) // Assuming getEnergyDiv() is 100
                                 }
                                 else {
                                     logInfo "(110) Total Reactive Power : ${value} raw (${value / getPowerDiv()} VAr)"
@@ -1459,13 +1642,26 @@ void parseZHAcommand(Map descMap) {
                                 }
                                 break
                             case '70' : // (112) isPJ1203A divideBy10
-                                logDebug "(112) PJ1203A voltage : ${value / getVoltageDiv()} raw ($value)"
-                                voltageEvent(value / getVoltageDiv())
+                                if (isSPM02V3()) {
+                                    logDebug "(70) SPM02V3 Voltage B : ${value / getVoltageDiv()} V raw ($value)"
+                                    phaseEvent("V", "voltage", value / getVoltageDiv()) // Assuming getVoltageDiv() is 10
+                                }
+                                else if (isPJ1203A()) { 
+                                    logDebug "(112) PJ1203A voltage : ${value / getVoltageDiv()} raw ($value)" 
+                                    voltageEvent(value / getVoltageDiv())
+                                }
+                                else {
+                                    logWarn "Unhandled dp=70 value=${value}"
+                                }
                                 break
                             case '71' : // (113) current_a: divideBy1000
                                 if (isPJ1203A()) {
                                     logDebug "(115) PJ1203A current_a : ${value / getCurrentDiv()} raw ($value)"
                                     amperageEvent(value / getCurrentDiv())
+                                }
+                                else if (isSPM02V3()) {
+                                    logDebug "(71) SPM02V3 Current B : ${value / getCurrentDiv()} A raw ($value)"
+                                    phaseEvent("B", "current", value / getCurrentDiv()) // Assuming getCurrentDiv() is 1000
                                 }
                                 else {
                                     logInfo "(113) Hoch Total Active Power (energy) is : ${value / getEnergyDiv()} (raw ${value}) kWh"
@@ -1477,6 +1673,10 @@ void parseZHAcommand(Map descMap) {
                                     logDebug "(115) PJ1203A current_b : ${value / getCurrentDiv()} raw ($value)"
                                     // amperageEvent(value / getCurrentDiv())
                                 }
+                                else if (isSPM02V3()) {
+                                    logDebug "(72) SPM02V3 Power B : ${value / getPowerDiv()} W raw ($value)"
+                                    phaseEvent("B", "power", value / getPowerDiv()) // Assuming getPowerDiv() is 1 (raw)
+                                }
                                 else {
                                     logInfo "(114) Hoch Total Reactive Power is : ${value / getPowerDiv()} raw (${value}) VAr"
                                 }
@@ -1486,11 +1686,92 @@ void parseZHAcommand(Map descMap) {
                                  // powerEvent(value / getPowerDiv())
                                 break
                             case '75' : // (117) hochTotalReverseActivePower: 117
-                                logInfo "(117) Hoch Total Reverse Active Power is : ${value / getPowerDiv()} raw (${value}) W"
+                                if (isSPM02V3()) {
+                                    logDebug "(75) SPM02V3 Power Factor B : ${value / getPowerFactorDiv()} % raw ($value)"
+                                    phaseEvent("B", "powerFactor", value / getPowerFactorDiv()) // Assuming getPowerFactorDiv() is 1 (raw)
+                                }
+                                else if (isHoch()) {
+                                    logInfo "(117) Hoch Total Reverse Active Power is : ${value / getPowerDiv()} raw (${value}) W"
+                                }
+                                else {
+                                    logWarn "Unhandled dp=75 value=${value}"
+                                }
+                                break
+                            case '76': // DP 118: Energy B (kWh) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(76) SPM02V3 Energy B : ${value / getEnergyDiv()} kWh raw ($value)"
+                                    phaseEvent("B", "energy", value / getEnergyDiv()) // Assuming getEnergyDiv() is 100
+                                }
+                                else {
+                                    logWarn "Unhandled dp=76 value=${value}"
+                                }
+                                break
+                            case '77': // DP 119: Energy Produced B (kWh) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(77) SPM02V3 Energy Produced B : ${value / getEnergyDiv()} kWh raw ($value)"
+                                    phaseEvent("B", "energyProduced", value / getEnergyDiv()) // Assuming getEnergyDiv() is 100
+                                }
+                                else {
+                                    logWarn "Unhandled dp=77 value=${value}"
+                                }
                                 break
                             case '79' : // (121) isPJ1203A()    divideBy100
-                                logInfo "(110) PJ1203A power_factor_b : ${value / getPowerFactorDiv()} raw ($value)"
-                                //powerFactorEvent(value / getPowerFactorDiv())
+                                if (isSPM02V3()) {
+                                    logDebug "(79) SPM02V3 Voltage C : ${value / getVoltageDiv()} V raw ($value)"
+                                    phaseEvent("C", "voltage", value / getVoltageDiv()) // Assuming getVoltageDiv() is 10
+                                }
+                                 else if (isPJ1203A()) { 
+                                    logInfo "(121) PJ1203A power_factor_b : ${value / getPowerFactorDiv()} raw ($value)" // Log used 110? Typo? Assuming 121
+                                    //powerFactorEvent(value / getPowerFactorDiv())
+                                }
+                                else {
+                                    logWarn "Unhandled dp=79 value=${value}"
+                                }
+                                break
+                            case '7A': // DP 122: Current C (A) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(7A) SPM02V3 Current C : ${value / getCurrentDiv()} A raw ($value)"
+                                    phaseEvent("C", "current", value / getCurrentDiv()) // Need currentCEvent helper; Assuming getCurrentDiv() is 1000
+                                }
+                                else {
+                                    logWarn "Unhandled dp=7A value=${value}"
+                                }
+                                break
+                            case '7B': // DP 123: Power C (W) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(7B) SPM02V3 Power C : ${value / getPowerDiv()} W raw ($value)"
+                                    phaseEvent("C", "power", value / getPowerDiv()) // Need powerCEvent helper; Assuming getPowerDiv() is 1 (raw)
+                                }
+                                else {
+                                    logWarn "Unhandled dp=7B value=${value}"
+                                }
+                                break
+                            case '7E': // DP 126: Power Factor C (%) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(7E) SPM02V3 Power Factor C : ${value / getPowerFactorDiv()} % raw ($value)"
+                                    phaseEvent("C", "powerFactor", value / getPowerFactorDiv()) // Need powerFactorCEvent helper; Assuming getPowerFactorDiv() is 1 (raw)
+                                }
+                                else {
+                                    logWarn "Unhandled dp=7E value=${value}"
+                                }
+                                break
+                            case '7F': // DP 127: Energy C (kWh) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(7F) SPM02V3 Energy C : ${value / getEnergyDiv()} kWh raw ($value)"
+                                    phaseEvent("C", "energy", value / getEnergyDiv()) // Assuming getEnergyDiv() is 100
+                                }
+                                else {
+                                    logWarn "Unhandled dp=7F value=${value}"
+                                }
+                                break
+                            case '80': // DP 128: Energy Produced C (kWh) - SPM02V3
+                                if (isSPM02V3()) {
+                                    logDebug "(80) SPM02V3 Energy Produced C : ${value / getEnergyDiv()} kWh raw ($value)"
+                                    phaseEvent("C", "energyProduced", value / getEnergyDiv()) // Assuming getEnergyDiv() is 100
+                                }
+                                else {
+                                    logWarn "Unhandled dp=80 value=${value}"
+                                }
                                 break
                             case '81' : // (129) isPJ1203A()    update_frequency
                                 logInfo "(129) PJ1203A update_frequency : ${value} raw ($value)"
